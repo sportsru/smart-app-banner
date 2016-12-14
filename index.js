@@ -1,184 +1,204 @@
-'use strict';
+define([], function () {
+    'use strict';
 
-var extend = require('xtend/mutable');
-var q = require('component-query');
-var doc = require('get-doc');
-var cookie = require('cookie-cutter');
-var ua = require('ua-parser-js');
+    function extend() {
+        var result = arguments[0];
+        for(var i = 1; i<arguments.length; i++) {
+            for (var key in arguments[i]) {
+                result[key] = arguments[i][key];
+            }
+        }
+        return result;
+    }
+
+    var storage = {
+        get: function (key) {
+            if (!window.localStorage[key] || window.localStorage[key] < new Date().getTime()) {
+                window.localStorage[key] = false;
+                return false;
+            }
+
+            return true;
+        },
+        set: function (key, value) {
+            window.localStorage[key] = value;
+        }
+    };
+
+    var userAgent = function (ua) {
+
+        var result = {};
+        if ((/(iPhone|iPad|iPod)/gi).test(ua)) {
+            result.os = 'ios';
+        }
+        if (userAgent.indexOf('Android') > 0) {
+            result.os = 'android';
+        }
+        if (/constructor/i.test(window.HTMLElement) || (function (p) {
+                return p.toString() === "[object SafariRemoteNotification]";
+            })(!window['safari'] || safari.pushNotification)) {
+            result.isSafari = true;
+        }
+        return result;
+    };
 
 // IE < 11 doesn't support navigator language property.
-/* global navigator */
-var userLangAttribute = navigator.language || navigator.userLanguage || navigator.browserLanguage;
-var userLang = userLangAttribute.slice(-2) || 'us';
-var root = doc && doc.documentElement;
-
+    /* global navigator */
+    var root = window.document.body;
 // platform dependent functionality
-var mixins = {
-	ios: {
-		appMeta: 'apple-itunes-app',
-		iconRels: ['apple-touch-icon-precomposed', 'apple-touch-icon'],
-		getStoreLink: function () {
-			return 'https://itunes.apple.com/' + this.options.appStoreLanguage + '/app/id' + this.appId;
-		}
-	},
-	android: {
-		appMeta: 'google-play-app',
-		iconRels: ['android-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
-		getStoreLink: function () {
-			return 'http://play.google.com/store/apps/details?id=' + this.appId;
-		}
-	},
-	windows: {
-		appMeta: 'msApplication-ID',
-		iconRels: ['windows-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
-		getStoreLink: function () {
-			return 'http://www.windowsphone.com/s?appid=' + this.appId;
-		}
-	}
-};
+    var mixins = {
+        ios: {
+            appMeta: 'apple-itunes-app',
+            iconRels: ['apple-touch-icon-precomposed', 'apple-touch-icon'],
+            getStoreLink: function () {
+                return 'https://itunes.apple.com/' + this.options.appStoreLanguage + '/app/id' + this.appId;
+            }
+        },
+        android: {
+            appMeta: 'google-play-app',
+            iconRels: ['android-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
+            getStoreLink: function () {
+                return 'http://play.google.com/store/apps/details?id=' + this.appId;
+            }
+        }
+    };
 
-var SmartBanner = function (options) {
-	var agent = ua(navigator.userAgent);
-	this.options = extend({}, {
-		daysHidden: 15,
-		daysReminder: 90,
-		appStoreLanguage: userLang, // Language code for App Store
-		button: 'OPEN', // Text for the install button
-		store: {
-			ios: 'On the App Store',
-			android: 'In Google Play',
-			windows: 'In the Windows Store'
-		},
-		price: {
-			ios: 'FREE',
-			android: 'FREE',
-			windows: 'FREE'
-		},
-		theme: '', // put platform type ('ios', 'android', etc.) here to force single theme on all device
-		icon: '', // full path to icon image if not using website icon image
-		force: '' // put platform type ('ios', 'android', etc.) here for emulation
-	}, options || {});
+    var SmartBanner = function (options) {
+        var agent = ua(navigator.userAgent);
 
-	if (this.options.force) {
-		this.type = this.options.force;
-	} else if (agent.os.name === 'Windows Phone' || agent.os.name === 'Windows Mobile') {
-		this.type = 'windows';
-	} else if (agent.os.name === 'iOS') {
-		this.type = 'ios';
-	} else if (agent.os.name === 'Android') {
-		this.type = 'android';
-	}
+        this.options = extend({}, {
+            daysHidden: 15,
+            daysReminder: 90,
+            appStoreLanguage: 'ru', // Language code for App Store
+            button: 'OPEN', // Text for the install button
+            store: {
+                ios: 'On the App Store',
+                android: 'In Google Play',
+                windows: 'In the Windows Store'
+            },
+            price: {
+                ios: 'FREE',
+                android: 'FREE',
+                windows: 'FREE'
+            },
+            theme: '', // put platform type ('ios', 'android', etc.) here to force single theme on all device
+            icon: '', // full path to icon image if not using website icon image
+            force: '' // put platform type ('ios', 'android', etc.) here for emulation
+        }, options || {});
 
-	// Don't show banner on ANY of the following conditions:
-	// - device os is not supported,
-	// - user is on mobile safari for ios 6 or greater (iOS >= 6 has native support for SmartAppBanner)
-	// - running on standalone mode
-	// - user dismissed banner
-	var unsupported = !this.type;
-	var isMobileSafari = (this.type === 'ios' && agent.browser.name === 'Mobile Safari' && Number(agent.os.version) >= 6);
-	var runningStandAlone = navigator.standalone;
-	var userDismissed = cookie.get('smartbanner-closed');
-	var userInstalled = cookie.get('smartbanner-installed');
+        if (this.options.force) {
+            this.type = this.options.force;
+        } else {
+            this.type = agent.os;
+        }
 
-	if (unsupported || isMobileSafari || runningStandAlone || userDismissed || userInstalled) {
-		return;
-	}
+        extend(this, mixins[this.type]);
 
-	extend(this, mixins[this.type]);
+        if (!this.parseAppId()) {
+            return;
+        }
 
-	// - If we dont have app id in meta, dont display the banner
-	if (!this.parseAppId()) {
-		return;
-	}
+        // Don't show banner on ANY of the following conditions:
+        // - device os is not supported,
+        // - user is on mobile safari for ios 6 or greater (iOS >= 6 has native support for SmartAppBanner)
+        // - running on standalone mode
+        // - user dismissed banner
+        var unsupported = !this.type;
+        var isMobileSafari = (this.type === 'ios' && agent.isSafari);
+        var runningStandAlone = navigator.standalone;
+        var userDismissed = ls.get('smartbanner-closed:' + this.appId);
+        var userInstalled = ls.get('smartbanner-installed:' + this.appId);
 
-	this.create();
-	this.show();
-};
+        if (unsupported || isMobileSafari || runningStandAlone || userDismissed || userInstalled) {
+            return;
+        }
 
-SmartBanner.prototype = {
-	constructor: SmartBanner,
 
-	create: function () {
-		var link = this.getStoreLink();
-		var inStore = this.options.price[this.type] + ' - ' + this.options.store[this.type];
-		var icon;
 
-		if (this.options.icon) {
-			icon = this.options.icon;
-		} else {
-			for (var i = 0; i < this.iconRels.length; i++) {
-				var rel = q('link[rel="' + this.iconRels[i] + '"]');
+        this.create();
+        this.show();
+    };
 
-				if (rel) {
-					icon = rel.getAttribute('href');
-					break;
-				}
-			}
-		}
+    SmartBanner.prototype = {
+        constructor: SmartBanner,
 
-		var sb = doc.createElement('div');
-		var theme = this.options.theme || this.type;
+        create: function () {
+            var link = this.getStoreLink();
+            var inStore = this.options.price[this.type] + ' - ' + this.options.store[this.type];
+            var icon;
 
-		sb.className = 'smartbanner smartbanner-' + theme;
-		sb.innerHTML = '<div class="smartbanner-container">' +
-							'<a href="javascript:void(0);" class="smartbanner-close">&times;</a>' +
-							'<span class="smartbanner-icon" style="background-image: url(' + icon + ')"></span>' +
-							'<div class="smartbanner-info">' +
-								'<div class="smartbanner-title">' + this.options.title + '</div>' +
-								'<div>' + this.options.author + '</div>' +
-								'<span>' + inStore + '</span>' +
-							'</div>' +
-							'<a href="' + link + '" class="smartbanner-button">' +
-								'<span class="smartbanner-button-text">' + this.options.button + '</span>' +
-							'</a>' +
-						'</div>';
+            if (this.options.icon) {
+                icon = this.options.icon;
+            } else {
+                for (var i = 0; i < this.iconRels.length; i++) {
+                    var rel = document.querySelector('link[rel="' + this.iconRels[i] + '"]');
 
-		// there isn’t neccessary a body
-		if (doc.body) {
-			doc.body.appendChild(sb);
-		}		else if (doc) {
-			doc.addEventListener('DOMContentLoaded', function () {
-				doc.body.appendChild(sb);
-			});
-		}
+                    if (rel) {
+                        icon = rel.getAttribute('href');
+                        break;
+                    }
+                }
+            }
 
-		q('.smartbanner-button', sb).addEventListener('click', this.install.bind(this), false);
-		q('.smartbanner-close', sb).addEventListener('click', this.close.bind(this), false);
-	},
-	hide: function () {
-		root.classList.remove('smartbanner-show');
-	},
-	show: function () {
-		root.classList.add('smartbanner-show');
-	},
-	close: function () {
-		this.hide();
-		cookie.set('smartbanner-closed', 'true', {
-			path: '/',
-			expires: new Date(Number(new Date()) + (this.options.daysHidden * 1000 * 60 * 60 * 24))
-		});
-	},
-	install: function () {
-		this.hide();
-		cookie.set('smartbanner-installed', 'true', {
-			path: '/',
-			expires: new Date(Number(new Date()) + (this.options.daysReminder * 1000 * 60 * 60 * 24))
-		});
-	},
-	parseAppId: function () {
-		var meta = q('meta[name="' + this.appMeta + '"]');
-		if (!meta) {
-			return;
-		}
+            var sb = document.createElement('div');
+            var theme = this.options.theme || this.type;
 
-		if (this.type === 'windows') {
-			this.appId = meta.getAttribute('content');
-		} else {
-			this.appId = /app-id=([^\s,]+)/.exec(meta.getAttribute('content'))[1];
-		}
+            sb.className = 'smartbanner smartbanner-' + theme;
+            sb.innerHTML = '<div class="smartbanner-container">' +
+            '<a href="javascript:void(0);" class="smartbanner-close">&times;</a>' +
+            '<span class="smartbanner-icon" style="background-image: url(' + icon + ')"></span>' +
+            '<div class="smartbanner-info">' +
+            '<div class="smartbanner-title"><span class="smartbanner-title-inner">' + this.options.title + '</span></div>' +
+            '<div>' + this.options.author + '</div>' +
+            '</div>' +
+            '<a href="' + link + '" class="smartbanner-button">' +
+            '<span class="smartbanner-button-text">' + this.options.button + '</span>' +
+            '</a>' +
+            '</div>';
 
-		return this.appId;
-	}
-};
+            if (document.body) {
+                document.body.appendChild(sb);
+            } else {
+                window.addEventListener('DOMContentLoaded', function () {
+                    document.body.appendChild(sb);
+                });
+            }
 
-module.exports = SmartBanner;
+            document.querySelector('.smartbanner-button', sb).addEventListener('click', this.install.bind(this), false);
+            document.querySelector('.smartbanner-close', sb).addEventListener('click', this.close.bind(this), false);
+        },
+        hide: function () {
+            root.classList.remove('smartbanner-show');
+        },
+        show: function () {
+            root.classList.add('smartbanner-show');
+            this.onShow && this.onShow(this.appId);
+        },
+        close: function () {
+            this.hide();
+            ls.set('smartbanner-closed:' + this.appId, (new Date(Number(new Date()) + (this.options.daysHidden * 1000 * 60 * 60 * 24))).getTime());
+            this.onClose && this.onClose(this.appId);
+        },
+        install: function () {
+            this.hide();
+            ls.set('smartbanner-installed:' + this.appId, (new Date(Number(new Date()) + (this.options.daysReminder * 1000 * 60 * 60 * 24))).getTime());
+            this.onInstall && this.onInstall(this.appId);
+        },
+        parseAppId: function () {
+            var meta = document.querySelector('meta[name="' + this.appMeta + '"]');
+            if (!meta) {
+                return;
+            }
+
+            if (this.type === 'windows') {
+                this.appId = meta.getAttribute('content');
+            } else {
+                this.appId = /app-id=([^\s,]+)/.exec(meta.getAttribute('content'))[1];
+            }
+
+            return this.appId;
+        }
+    };
+
+    return SmartBanner;
+});
