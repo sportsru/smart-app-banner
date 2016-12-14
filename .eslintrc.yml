@@ -7,7 +7,7 @@ rules:
     - 0
   indent:
     - error
-    - tab
+    - space
   linebreak-style:
     - 0
   quotes:
