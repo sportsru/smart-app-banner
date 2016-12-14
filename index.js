@@ -35,7 +35,7 @@ define([], function () {
             result.os = 'android';
         }
         if (/constructor/i.test(window.HTMLElement) || (function (p) {
-                return p.toString() === "[object SafariRemoteNotification]";
+                return p.toString() === '[object SafariRemoteNotification]';
             })(!window['safari'] || safari.pushNotification)) {
             result.isSafari = true;
         }
@@ -75,11 +75,6 @@ define([], function () {
                 ios: 'On the App Store',
                 android: 'In Google Play',
                 windows: 'In the Windows Store'
-            },
-            price: {
-                ios: 'FREE',
-                android: 'FREE',
-                windows: 'FREE'
             },
             theme: '', // put platform type ('ios', 'android', etc.) here to force single theme on all device
             icon: '', // full path to icon image if not using website icon image
@@ -124,7 +119,6 @@ define([], function () {
 
         create: function () {
             var link = this.getStoreLink();
-            var inStore = this.options.price[this.type] + ' - ' + this.options.store[this.type];
             var icon;
 
             if (this.options.icon) {
