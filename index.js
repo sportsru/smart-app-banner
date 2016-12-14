@@ -173,14 +173,10 @@ define([], function () {
         show: function () {
             root.classList.add('smartbanner-show');
             this.onShow && this.onShow(this.appId);
-            Analytics.gaSendEvent('smart-app-banner:' + this.appId, 'view');
-            Analytics.paqSet('_event', ['setCustomVariable', 1, 'smart-app-banner:' + this.appId, 'view', 'page'], ['trackPageView']);
         },
         close: function () {
             this.hide();
             ls.set('smartbanner-closed:' + this.appId, (new Date(Number(new Date()) + (this.options.daysHidden * 1000 * 60 * 60 * 24))).getTime());
-            Analytics.gaSendEvent('smart-app-banner:' + this.appId, 'close');
-            Analytics.paqSet('_event', ['setCustomVariable', 1, 'smart-app-banner:' + this.appId, 'close', 'page'], ['trackPageView']);
             this.onClose && this.onClose(this.appId);
         },
         install: function () {
