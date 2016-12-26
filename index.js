@@ -13,7 +13,7 @@ define([], function () {
 
     var storage = {
         get: function (key) {
-            if (!window.localStorage[key] || window.localStorage[key] < new Date().getTime()) {
+            if ((window.localStorage[key] === 'false' || window.localStorage[key] === undefined) || window.localStorage[key] < new Date().getTime()) {
                 window.localStorage[key] = false;
                 return false;
             }
@@ -34,9 +34,7 @@ define([], function () {
         if (ua.indexOf('Android') > 0) {
             result.os = 'android';
         }
-        if (/constructor/i.test(window.HTMLElement) || (function (p) {
-                return p.toString() === '[object SafariRemoteNotification]';
-            })(!window['safari'] || safari.pushNotification)) {
+        if (ua.indexOf('like Gecko) Version/') >= 0) {
             result.isSafari = true;
         }
         return result;
@@ -58,7 +56,7 @@ define([], function () {
             appMeta: 'google-play-app',
             iconRels: ['android-touch-icon', 'apple-touch-icon-precomposed', 'apple-touch-icon'],
             getStoreLink: function () {
-                return 'http://play.google.com/store/apps/details?id=' + this.appId;
+                return 'http://play.google.com/store/apps/details?id=' + this.appId + this.options.googleUtm;
             }
         }
     };
@@ -166,17 +164,17 @@ define([], function () {
         },
         show: function () {
             root.classList.add('smartbanner-show');
-            this.onShow && this.onShow(this.appId);
+            this.options.onShow && this.options.onShow(this.appId);
         },
         close: function () {
             this.hide();
-            storage.set('smartbanner-closed:' + this.appId, (new Date(Number(new Date()) + (this.options.daysHidden * 1000 * 60 * 60 * 24))).getTime());
-            this.onClose && this.onClose(this.appId);
+            storage.set('smartbanner-closed:' + this.appId, (new Date(Date.now() +  (this.options.daysHidden * 1000 * 60 * 60 * 24))).getTime());
+            this.options.onClose && this.options.onClose(this.appId);
         },
         install: function () {
             this.hide();
-            storage.set('smartbanner-installed:' + this.appId, (new Date(Number(new Date()) + (this.options.daysReminder * 1000 * 60 * 60 * 24))).getTime());
-            this.onInstall && this.onInstall(this.appId);
+            storage.set('smartbanner-installed:' + this.appId, (new Date(Date.now() +  (this.options.daysReminder * 1000 * 60 * 60 * 24))).getTime());
+            this.options.onInstall && this.options.onInstall(this.appId);
         },
         parseAppId: function () {
             var meta = document.querySelector('meta[name="' + this.appMeta + '"]');
