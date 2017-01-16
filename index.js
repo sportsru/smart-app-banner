@@ -177,15 +177,16 @@ define([], function () {
             this.options.onInstall && this.options.onInstall(this.appId);
         },
         parseAppId: function () {
-            var meta = document.querySelector('meta[name="' + this.appMeta + '"]');
+            var meta = document.querySelector('meta[name="' + this.appMeta + '"]') || document.querySelector('meta[property="' + this.appMeta + '"]'),
+                appId;
             if (!meta) {
                 return;
             }
-
-            if (this.type === 'windows') {
-                this.appId = meta.getAttribute('content');
+            appId = meta.getAttribute('content');
+            if (appId) {
+                this.appId = /app-id=([^\s,]+)/.exec(appId)[1];
             } else {
-                this.appId = /app-id=([^\s,]+)/.exec(meta.getAttribute('content'))[1];
+                this.appId = null;
             }
 
             return this.appId;
